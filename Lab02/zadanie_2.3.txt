@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Shebang – informuje system, że skrypt należy wykonać przy użyciu interpretera Bash odnalezionego w środowisku ($PATH)
+
+# Filtrowanie nieskończonego strumienia danych z pliku urządzenia /dev/urandom
+tr -cd '[:alnum:] \n-' < /dev/urandom
+# tr                      – narzędzie do zamiany lub usuwania pojedynczych znaków ze strumienia tekstu
+# -c (--complement)       – odwraca zbiór znaków (oznacza: "wszystko OPRÓCZ podanych znaków")
+# -d (--delete)           – nakazuje usuwanie pasujących znaków
+# -cd                     – połączenie opcji: usuń wszystkie znaki Z WYJĄTKIEM tych wymienionych w cudzysłowie
+# '[:alnum:] \n-'         – zbiór dozwolonych znaków, które NIE zostaną usunięte:
+#    [:alnum:]            – klasa POSIX obejmująca litery i cyfry (a-z, A-Z, 0-9)
+#    (spacja)             – pozwala na przelot zwykłych spacji
+#    \n                   – znak nowej linii (dzieki niemu tekst łamie się na wiersze)
+#    -                    – myślnik (umieszczony na końcu, by tr nie zinterpretował go jako zakresu)
+# < /dev/urandom          – operator przekierowania wejścia (<); przekazuje strumień pseudolosowych bajtów z /dev/urandom na wejście komendy tr

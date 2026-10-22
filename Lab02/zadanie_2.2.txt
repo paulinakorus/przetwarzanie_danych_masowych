@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Shebang – informuje system, że skrypt powinien być wykonany przy użyciu powłoki Bash odnalezionej w środowisku ($PATH)
+
+set -euo pipefail
+# Ustawienia flag bezpieczeństwa:
+# -e: przerywa skrypt po wystąpieniu pierwszego błędu (status != 0)
+# -u: zgłasza błąd przy próbie użycia niezdefiniowanej zmiennej
+# -o pipefail: przerywa działanie, jeśli jakakolwiek komenda w potoku (|) zwróci błąd
+
+if [ $# -lt 1 ]; then
+    # $# – liczba przekazanych argumentów
+    # -lt 1 – warunek "less than 1" (mniej niż 1 argument)
+
+    echo "Użycie: $0 \"<komenda-do-zakończenia>\"" >&2
+    # $0 – nazwa bieżącego skryptu
+    # >&2 – przekierowanie komunikatu ze standardowego wyjścia na wyjście błędów (stderr)
+
+    exit 1
+    # Zakończenie działania skryptu z kodem błędu 1
+fi
+# fi – kończy blok instrukcji warunkowej if
+
+TARGET_CMD="$1"
+# Przypisanie pierwszego argumentu skryptu ($1) do czytelnej zmiennej TARGET_CMD
+
+# Wyszukiwanie procesów z wykluczeniem PID bieżącego skryptu ($$) oraz procesów potomnych
+PIDS=$(pgrep -f "$TARGET_CMD" | grep -v -E "$$|$PPID" || true)
+# pgrep -f "$TARGET_CMD" – wyszukuje PID-y procesów pasujących do wzorca w pełnym wierszu polecenia
+# | – potok przesyłający wynik pgrep do polecenia grep
+# grep -v -E "$$|$PPID" – odrzuca (-v) PID bieżącego skryptu ($$) i jego procesu macierzystego ($PPID)
+# || true – chroni skrypt przed natychmiastowym przerwaniem przez "set -e", jeśli grep nic nie znajdzie
+
+if [ -z "$PIDS" ]; then
+    # -z "$PIDS" – sprawdza, czy zmienna PIDS jest pusta (brak pasujących procesów)
+
+    echo "Nie znaleziono pasujących procesów dla: '$TARGET_CMD'"
+    # Wyświetla komunikat informacyjny o braku procesów na standardowym wyjściu (stdout)
+
+    exit 1
+    # Zakończenie skryptu ze statusem błędu 1
+fi
+# fi – koniec bloku if
+
+# Zamiana znaków nowej linii na spacje dla czytelnego wyświetlania
+PIDS_SINGLE_LINE=$(echo $PIDS | tr '\n' ' ')
+# echo $PIDS – rozpłaszcza wielowierszowy ciąg PID-ów
+# tr '\n' ' ' – zamienia znaki nowej linii na spacje, ułatwiając estetyczne wyświetlenie wyników
+
+echo "Zamykanie procesów o PID: $PIDS_SINGLE_LINE"
+# Wypisuje na standardowym wyjściu listę PID-ów przeznaczonych do zamknięcia
+
+# Ciche zamykanie, aby zignorować ewentualnie uciekające podprocesy
+kill $PIDS 2>/dev/null || true
+# kill $PIDS – wysyła domyślny sygnał SIGTERM (15) do wszystkich znalezionych procesów
+# 2>/dev/null – przekierowuje ewentualne komunikaty o błędach (stderr) do "czarnej dziury"
+# || true – zabezpiecza skrypt przed przerwaniem działania przez "set -e", jeśli proces zniknął tuż przed wywołaniem kill

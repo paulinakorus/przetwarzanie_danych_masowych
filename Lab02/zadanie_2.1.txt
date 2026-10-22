@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+# Shebang – informuje system, że skrypt powinien być wykonany przy użyciu powłoki Bash odnalezionej w środowisku ($PATH)
+
+set -euo pipefail
+# Ustawienia flag bezpieczeństwa Bash:
+# -e (errexit): powoduje natychmiastowe przerwanie skryptu, jeśli którekolwiek polecenie zwróci błąd (kod wyjścia != 0)
+# -u (nounset): traktuje próbę odwołania się do niezdefiniowanej zmiennej jako błąd i przerywa działanie skryptu
+# -o pipefail: powoduje, że cały potok (pipe "|") zwraca status błędu, jeśli któregokolwiek z poleceń w potoku się nie powiedzie
+
+if [ $# -lt 1 ]; then
+    # $# – zmienna przechowująca liczbę argumentów przekazanych do skryptu
+    # -lt 1 – warunek "less than" (mniejsze niż 1); sprawdza, czy nie podano argumentu
+
+    echo "Użycie: $0 \"<komenda-do-uruchomienia>\"" >&2
+    # $0 – nazwa bieżącego skryptu
+    # >&2 – przekierowuje komunikat ze standardowego wyjścia (stdout) na wyjście błędów (stderr)
+
+    exit 1
+    # Kończy działanie skryptu i zwraca kod błędu 1
+fi
+# fi – kończy blok instrukcji warunkowej if
+
+# Uruchomienie komendy przekazanej w argumencie w tle za pomocą bash -c oraz &
+bash -c "$1" &
+# $1 – pierwszy argument przekazany do skryptu (przechowuje polecenie do uruchomienia)
+# bash -c – wykonuje podany ciąg znaków jako komendę powłoki Bash
+# & – uruchamia całe polecenie w tle (podproces wywołuje się asynchronicznie)
+
+PID=$!
+# $! – zmienna specjalna zawierająca PID (Process ID) ostatniego procesu uruchomionego w tle
+# PID=$! – zapisuje ten identyfikator procesu do zmiennej PID
+
+echo "Uruchomiono w tle polecenie: '$1' (PID: $PID)"
+# Wypisuje na standardowym wyjściu informację o uruchomionym poleceniu i jego identyfikatorze PID
