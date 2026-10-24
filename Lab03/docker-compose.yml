@@ -1,0 +1,57 @@
+services:
+  content:
+    image: nginx:alpine
+    # Każda replika zapisuje swoją nazwę hosta w index.html,
+    # dzięki czemu widać rozkładanie ruchu przez load-balancer.
+    command:
+      - sh
+      - -c
+      - |
+        echo "Hello from $$HOSTNAME" > /usr/share/nginx/html/index.html
+        exec nginx -g 'daemon off;'
+    deploy:
+      replicas: 3
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:80/"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  load-balancer:
+    image: nginx:alpine
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      content:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - app-net
+
+  checker:
+    image: curlimages/curl:latest
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          if RESP=$$(curl -fsS --max-time 3 http://load-balancer/); then
+            echo "[$$(date +%T)] OK   -> $$RESP"
+          else
+            echo "[$$(date +%T)] FAIL -> treść niedostępna"
+          fi
+          sleep 5
+        done
+    depends_on:
+      - load-balancer
+    restart: unless-stopped
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    driver: bridge
