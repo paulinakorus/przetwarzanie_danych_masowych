@@ -19,18 +19,18 @@ się w trybie poleceń (Command / Normal Mode). Przejście do tego trybu następ
 po naciśnięciu klawisza [Esc].
 
 * Wyszukiwanie frazy w tekście:
-  - Polecenie: /fraza + [Enter]
+  - Polecenie1: /fraza + [Enter]
   - Opis: Wyszukuje wystąpienie podanego ciągu od aktualnej pozycji kursora w dół.
   - Nawigacja:
     * Naciśnięcie klawisza 'n' przenosi do kolejnego dopasowania w dół.
     * Naciśnięcie klawisza 'N' przenosi do poprzedniego dopasowania w górę.
 
 * Przejście do podanej linii:
-  - Polecenie: :numer_linii + [Enter] (np. :42) lub skrót 42G
+  - Polecenie1: :numer_linii + [Enter] (np. :42) lub skrót 42G
   - Opis: Kursor zostaje natychmiast przeniesiony do wybranego wiersza pliku.
 
 * Podmiana pojedynczego znaku:
-  - Polecenie: [r] + nowy_znak
+  - Polecenie1: [r] + nowy_znak
   - Opis: Ustawienie kursora na modyfikowanym znaku, naciśnięcie klawisza 'r', 
     a następnie wpisanie nowego znaku zamienia go bez przechodzenia w tryb edycji.
 
@@ -38,14 +38,14 @@ po naciśnięciu klawisza [Esc].
   - Zamiana w bieżącej linii:
     :s/stary_tekst/nowy_tekst/
     (Zamienia pierwsze wystąpienie w aktualnym wierszu)
-  - Zamiana w całym pliku:
+  - Zamiana1 w całym pliku:
     :%s/stary_tekst/nowy_tekst/g
     (Zamienia wszystkie wystąpienia frazy w całym dokumencie)
 
 * Zapisanie zmian w pliku:
-  - Polecenie: :w + [Enter]
-  - Opis: Zapisuje wprowadzone modyfikacje bez zamykania edytora.
+  - Polecenie1: :w + [Enter]
+  - Opis1: Zapisuje wprowadzone modyfikacje bez zamykania edytora.
 
 * Wyjście z edytora Vim:
-  - Sposób 1 (Zapis i wyjście): :wq + [Enter] lub skrót ZZ
-  - Sposób 2 (Wyjście bez zapisu): :q! + [Enter] (odrzuca niezapisane zmiany)
+  - Sposób1 1 (Zapis i wyjście): :wq + [Enter] lub skrót ZZ
+  - Sposób1 2 (Wyjście bez zapisu): :q! + [Enter] (odrzuca niezapisane zmiany)

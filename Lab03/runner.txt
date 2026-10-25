@@ -1,0 +1,4 @@
+docker build -t hello:1.0 . && docker run --rm hello:1.0
+docker run --rm hello:1.0 Jan
+docker login && DOCKERHUB_USER=koruspaulina ./publish.sh ./Dockerfile
+docker compose up

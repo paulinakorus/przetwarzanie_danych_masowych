@@ -25,8 +25,11 @@ if [[ ! -f "$DOCKERFILE" ]]; then
 fi
 
 if [[ -z "${DOCKERHUB_USER:-}" ]]; then
-  echo "Błąd: ustaw zmienną DOCKERHUB_USER (login na Docker Hub)." >&2
-  exit 1
+  read -rp "Login Docker Hub: " DOCKERHUB_USER
+  if [[ -z "$DOCKERHUB_USER" ]]; then
+    echo "Błąd: login Docker Hub nie może być pusty." >&2
+    exit 1
+  fi
 fi
 
 IMAGE_NAME="${IMAGE_NAME:-lab3-hello}"
