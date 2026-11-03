@@ -1,7 +1,8 @@
 # Laboratorium 3
 ## Podstawy wykorzystania kontenerów - Docker, containerd
 
-Podczas rozwoju jak i wdrażania aplikacji zalecane jest używanie reprodukowalnych i odizolowanych środowisk. Do tego celu można użyć **kontenerów**. Jednym z najpopularniejszych narzędzi do tworzenia i zarządzania kontenerami jest Docker. Mieliście z nim już do czynienia podczas zajęć z *Przetwarzania danych i odkrywania wiedzy* – [laboratorium L6](https://pwr-ai.github.io/przetwarzanie-danych-i-odkrywanie-wiedzy/laboratoria/lab6-produktyzacja.html). W ramach obecnego laboratorium przypomnimy sobie podstawy tego narzędzia, ponieważ będzie ono wykorzystywane do końca semestru.
+Podczas rozwoju jak i wdrażania aplikacji zalecane jest używanie reprodukowalnych i odizolowanych środowisk. Do tego celu m
+ożna użyć **kontenerów**. Jednym z najpopularniejszych narzędzi do tworzenia i zarządzania kontenerami jest Docker. Mieliście z nim już do czynienia podczas zajęć z *Przetwarzania danych i odkrywania wiedzy* – [laboratorium L6](https://pwr-ai.github.io/przetwarzanie-danych-i-odkrywanie-wiedzy/laboratoria/lab6-produktyzacja.html). W ramach obecnego laboratorium przypomnimy sobie podstawy tego narzędzia, ponieważ będzie ono wykorzystywane do końca semestru.
 
 # Kontenery a maszyny wirtualne
 
