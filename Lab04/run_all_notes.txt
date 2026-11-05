@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Wskazuje interpreter Bash do wykonania skryptu
+set -euo pipefail
+# Włącza tryb bezpieczny Basha:
+#  -e: przerywa skrypt w przypadku błędu któregokolwiek polecenia
+#  -u: traktuje odwołanie do niezdefiniowanej zmiennej jako błąd
+#  -o pipefail: przekazuje kod błędu, jeśli dowolna część potoku (|) zawiedzie
+
+# Lista rozmiarów zbiorów danych do wygenerowania (liczba próbek)
+SIZES=(10000 100000 1000000)
+
+# Ścieżka do katalogu, w którym zostaną zapisane wygenerowane pliki .pkl
+DATASETS_DIR=data/datasets
+
+# Deklaracja tablicy asocjacyjnej (mapy): wersja Pythona -> dedykowana wersja NumPy
+declare -A NUMPY_VERSION=(
+    ["3.10"]="1.26.4" # Python 3.10 testowany ze stabilnym NumPy 1.x
+    ["3.12"]="2.0.2"  # Python 3.12 testowany z wydaniem NumPy 2.0
+    ["3.13"]="2.1.3"  # Python 3.13 testowany z najnowszym NumPy 2.1
+)
+
+# -----------------------------------------------------------------------------
+# KROK 1: Generowanie zbiorów danych o różnych rozmiarach
+# -----------------------------------------------------------------------------
+# Pętla iteruje po każdym rozmiarze zdefiniowanym w tablicy SIZES
+for n in "${SIZES[@]}"; do
+    # Uruchomienie kontenera Docker:
+    #  --rm               : automatycznie usuwa kontener po zakończeniu jego pracy
+    #  -v "$PWD":/app     : montuje obecny katalog z hosta do podścieżki /app w kontenerze
+    #  -w /app            : ustawia katalog roboczy wewnątrz kontenera na /app
+    #  python:3.12-slim   : obraz bazowy z gotowym Pythonem 3.12
+    #  python scripts/... : wywołanie skryptu generującego plik <n>.pkl w katalogu wyjściowym
+    docker run --rm -v "$PWD":/app -w /app python:3.12-slim \
+        python scripts/generate_data.py --num-samples "$n" --out-dir "$DATASETS_DIR"
+done
+
+# -----------------------------------------------------------------------------
+# KROK 2: Przeprowadzenie eksperymentów dla każdej wersji Pythona
+# -----------------------------------------------------------------------------
+# Pętla przechodzi po kolejnych wersjach Pythona (3.10, 3.12, 3.13)
+for py in 3.10 3.12 3.13; do
+    # Pobranie wersji NumPy przypisanej do bieżącej wersji Pythona
+    np_ver="${NUMPY_VERSION[$py]}"
+
+    # Uruchomienie eksperymentu w odizolowanym środowisku wybranego Pythona:
+    #  -e PYTHONPATH=/app        : dodaje katalog główny do ścieżki wyszukiwania modułów (dla pakietu `lr`)
+    #  -e OPENBLAS_NUM_THREADS=1 : wymusza 1 wątek OpenBLAS na poziomie zmiennych kontenera
+    #  python:"$py"-slim         : dynamiczny dobór obrazu Pythona (np. python:3.10-slim)
+    #  bash -c "..."             : seria poleceń wykonywanych bezpośrednio wewnątrz kontenera
+    docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app \
+        -e OPENBLAS_NUM_THREADS=1 python:"$py"-slim \
+        bash -c "pip install -q numpy==$np_ver matplotlib threadpoolctl && \
+                 python scripts/run_experiments.py \
+                     --datasets-dir $DATASETS_DIR --out-dir data/py$py"
+    # Szczegóły wewnątrz bash -c:
+    # 1. pip install -q ...  : cicha instalacja specyficznej wersji NumPy i bibliotek pomocniczych
+    # 2. &&                  : uruchamia eksperyment tylko pod warunkiem udanej instalacji zależności
+    # 3. --out-dir data/py$py: zapisuje wyniki (JSON i PNG) do odrębnego folderu dla każdej wersji (np. data/py3.10)
+done
