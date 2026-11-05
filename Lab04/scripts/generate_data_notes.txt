@@ -1,0 +1,67 @@
+"""Script for generation of artificial datasets."""
+import argparse  # Moduł do obsługi argumentów z wiersza poleceń (konsoli)
+import os  # Moduł do operacji na systemie plików (ścieżki, katalogi)
+import pickle  # Moduł do serializacji i zapisu obiektów w formacie binarnym
+import random  # Moduł do generowania liczb losowych
+from typing import List, Tuple  # Typy do adnotacji typów (type hinting)
+
+
+def get_args() -> argparse.Namespace:
+    """Parses script arguments."""
+    # Inicjalizacja parsera argumentów wiersza poleceń
+    parser = argparse.ArgumentParser()
+
+    # Wymagany argument: liczba próbek do wygenerowania (typ int)
+    parser.add_argument(
+        "--num-samples",
+        required=True,
+        help="Number of samples to generate",
+        type=int,
+    )
+    # Wymagany argument: katalog do zapisu wyniku (typ str)
+    parser.add_argument(
+        "--out-dir",
+        required=True,
+        help="Name of directory to save generated data",
+        type=str,
+    )
+
+    # Przetworzenie i zwrócenie przekazanych argumentów jako obiekt Namespace
+    return parser.parse_args()
+
+
+def generate_data(num_samples: int) -> Tuple[List[float], List[float]]:
+    """Generated X, y with given number of data samples."""
+    # Generowanie listy X z 'num_samples' losowych liczb z przedziału [-100.0, 100.0]
+    X = [random.uniform(-100.0, 100.0) for _ in range(num_samples)]
+
+    # Obliczenie wartości y na podstawie zależności liniowej y = 2.0 * x + 5.0
+    # (Poprawiono błąd składniowy i przełamanie linii z pierwotnego kodu)
+    y = [2.0 * x + 5.0 for x in X]
+
+    # Zwrócenie krotki z dwiema listami: X i y
+    return X, y
+
+
+def main() -> None:
+    """Runs script."""
+    # Pobranie argumentów przekazanych przy uruchomieniu skryptu
+    args = get_args()
+
+    # Wygenerowanie zbiorów X i y dla podanej w argumentach liczby próbek
+    X, y = generate_data(args.num_samples)
+
+    # Utworzenie folderu docelowego (exist_ok=True zapobiega błędowi, gdy folder już istnieje)
+    os.makedirs(args.out_dir, exist_ok=True)
+
+    # Połączenie ścieżki katalogu z nazwą pliku (np. 'moj_folder/100.pkl')
+    path = os.path.join(args.out_dir, f"{args.num_samples}.pkl")
+
+    # Otwarcie pliku w trybie binarnego zapisu ("wb") i zrzucenie obiektów (X, y) za pomocą pickle
+    with open(path, "wb") as f:
+        pickle.dump((X, y), f)
+
+
+if __name__ == "__main__":
+    # Punkt wejścia – wywołanie funkcji main(), jeśli plik jest uruchamiany bezpośrednio
+    main()

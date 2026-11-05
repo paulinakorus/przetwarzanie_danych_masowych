@@ -1,0 +1,70 @@
+from concurrent.futures import ProcessPoolExecutor  # Moduł do równoległego uruchamiania zadań w osobnych procesach (omija blokadę GIL)
+from typing import List, Tuple  # Import typów do adnotacji (type hinting)
+
+from lr import base  # Import modułu bazowego z klasą LinearRegression
+
+
+def _partial_sums(batch: Tuple[List[float], List[float]]):
+    """MAP: sums for a single batch (top-level function, so it can be pickled)."""
+    xs, ys = batch  # Rozpakowanie krotki na listy danych X i y dla pojedynczej paczki
+
+    # Inicjalizacja akumulatorów sum cząstkowych dla procesora roboczego
+    sx = 0.0
+    sy = 0.0
+    sxy = 0.0
+    sxx = 0.0
+
+    # Obliczenie sum dla elementów wewnątrz przypisanej paczki
+    for xi, yi in zip(xs, ys):
+        sx += xi
+        sy += yi
+        sxy += xi * yi
+        sxx += xi * xi
+
+    # Zwrócenie liczby próbek oraz wyliczonych sum cząstkowych do procesu głównego
+    return len(xs), sx, sy, sxy, sxx
+
+
+def _split(X: List[float], y: List[float], n_batches: int):
+    # Obliczenie rozmiaru pojedynczej paczki z zaokrągleniem w górę (ceil division)
+    size = -(-len(X) // n_batches)
+
+    # Tworzenie listy krotek zawierających fragmenty (slajsy) danych X i y
+    return [
+        (X[i:i + size], y[i:i + size])
+        for i in range(0, len(X), size)
+    ]
+
+
+class LinearRegressionProcess(base.LinearRegression):  # Klasa regresji liniowej z przetwarzaniem wieloprocesowym
+    def __init__(self, n_workers: int = 4):
+        super().__init__()  # Wywołanie konstruktora klasy bazowej
+        self.n_workers = n_workers  # Liczba procesów roboczych (domyślnie 4)
+
+    def fit(self, X: List[float], y: List[float]) -> base.LinearRegression:
+        # Podział danych wejściowych na paczki dla poszczególnych procesów
+        batches = _split(X, y, self.n_workers)
+
+        # Tworzenie puli osobnych procesów systemowych (każdy proces ma własną pamięć i interpreter Pythona)
+        with ProcessPoolExecutor(max_workers=self.n_workers) as ex:
+            # FAZA MAP: przesłanie paczek (poprzez serializację pickle) i równoległa praca w osobnych procesach
+            parts = list(ex.map(_partial_sums, batches))
+
+        # FAZA REDUCE: zsumowanie wyników zwróconych przez wszystkie procesy (agregacja sum cząstkowych)
+        n = sum(p[0] for p in parts)    # Całkowita liczba próbek
+        sx = sum(p[1] for p in parts)   # Całkowita suma X
+        sy = sum(p[2] for p in parts)   # Całkowita suma y
+        sxy = sum(p[3] for p in parts)  # Całkowita suma iloczynów (X * y)
+        sxx = sum(p[4] for p in parts)  # Całkowita suma kwadratów (X^2)
+
+        # Obliczenie współczynnika kierunkowego b1 (slope) wg wzoru MNK
+        b1 = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+
+        # Obliczenie wyrazu wolnego b0 (intercept)
+        b0 = (sy - b1 * sx) / n
+
+        # Zapisanie parametrów prostej jako krotka (wyraz wolny b0, nachylenie b1)
+        self._coef = (b0, b1)
+
+        # Zwrócenie instancji obiektu (umożliwia chaining, np. model.fit(X, y).predict(X))
+        return self

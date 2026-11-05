@@ -23,8 +23,7 @@ def _partial_sums(batch: Tuple[List[float], List[float]]):
 def _split(X: List[float], y: List[float], n_batches: int):
     size = -(-len(X) // n_batches)  # ceil division
     return [
-        (X[i:i + size], y[i:i + size])
-        for i in range(0, len(X), size)
+        (X[i:i + size], y[i:i + size]) for i in range(0, len(X), size)
     ]
 
 

@@ -1,0 +1,33 @@
+from __future__ import annotations  # Włącza odroczone wartościowanie typów (pozwala na użycie nazwy klasy jako typu wewnątrz tej samej klasy)
+
+import abc  # Moduł do tworzenia klas i metod abstrakcyjnych (Abstract Base Classes)
+from typing import List  # Import struktury List do adnotacji typów
+
+import numpy as np  # Biblioteka do operacji numerycznych i wektorowych
+
+
+class ScikitPredictor(abc.ABC):  # Abstrakcyjna klasa bazowa określająca interfejs dla modeli predykcyjnych
+
+    @abc.abstractmethod  # Oznacza metodę jako abstrakcyjną – wymusza jej zaimplementowanie w klasach potomnych
+    def fit(self, X, y):
+        pass  # Pusta treść metody służącej do dopasowania/trenowania modelu
+
+    @abc.abstractmethod  # Oznacza metodę jako abstrakcyjną
+    def predict(self, X):
+        pass  # Pusta treść metody służącej do generowania przewidywań
+
+
+class LinearRegression(ScikitPredictor):  # Klasa regresji liniowej dziedzicząca po interfejsie ScikitPredictor
+
+    def __init__(self):
+        self._coef = None  # Inicjalizacja atrybutu na współczynniki prostej; początkowo None (model niewytrenowany)
+
+    @abc.abstractmethod  # Doprecyzowuje typy argumentów, ale metoda pozostaje abstrakcyjna do dalszego zaimplementowania
+    def fit(self, X: List[float], y: List[float]) -> LinearRegression:
+        pass  # Pusta implementacja algorytmu uczenia
+
+    def predict(self, X: List[float]) -> np.ndarray:
+        if self._coef is None:  # Weryfikacja, czy współczynniki wyrazu wolnego i nachylenia zostały już obliczone
+            raise RuntimeError("Please fit model before prediction")  # Zgłoszenie błędu, jeśli model nie został wytrenowany
+
+        return self._coef[0] + self._coef[1] * np.array(X)  # Wyliczenie predykcji wg wzoru y = a + b * x i zwrócenie jako tablica NumPy

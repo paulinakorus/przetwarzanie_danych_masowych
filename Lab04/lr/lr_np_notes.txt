@@ -1,0 +1,32 @@
+from typing import List  # Import struktury List do adnotacji typów
+
+import numpy as np  # Import biblioteki NumPy do szybkich operacji wektorowych
+
+from lr import base  # Import modułu bazowego zawierającego abstrakcyjną klasę LinearRegression
+
+
+class LinearRegressionNumpy(base.LinearRegression):  # Klasa regresji liniowej zoptymalizowana za pomocą NumPy
+    def fit(self, X: List[float], y: List[float]) -> base.LinearRegression:
+        # Konwersja list Pythona na tablice NumPy z precyzją 64-bitowych liczb zmiennoprzecinkowych
+        x = np.asarray(X, dtype=np.float64)
+        y = np.asarray(y, dtype=np.float64)
+
+        n = x.size  # Liczba elementów (próbek) w zbiorze
+
+        # Wektorowe obliczanie sum bez używania pętli Pythona
+        sx = x.sum()  # Suma wartości X
+        sy = y.sum()  # Suma wartości y
+        sxy = np.dot(x, y)  # Iloczyn skalarny: suma produktów odpowiadających sobie elementów (x * y)
+        sxx = np.dot(x, x)  # Iloczyn skalarny: suma kwadratów elementów (x^2)
+
+        # Obliczenie współczynnika kierunkowego b1 (slope) wg wzoru MNK
+        b1 = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+
+        # Obliczenie wyrazu wolnego b0 (intercept)
+        b0 = (sy - b1 * sx) / n
+
+        # Zapisanie parametrów prostej jako krotka (wyraz wolny b0, nachylenie b1)
+        self._coef = (b0, b1)
+
+        # Zwrócenie instancji obiektu (umożliwia chaining, np. model.fit(X, y).predict(X))
+        return self

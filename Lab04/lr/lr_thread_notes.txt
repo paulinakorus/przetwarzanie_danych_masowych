@@ -1,0 +1,69 @@
+from concurrent.futures import ThreadPoolExecutor  # Moduł do wykonywania zadań w puli wątków (wielowątkowość)
+from typing import List, Tuple  # Import typów do adnotacji (type hinting)
+
+from lr import base  # Import modułu bazowego zawierającego klasę LinearRegression
+
+
+def _partial_sums(batch: Tuple[List[float], List[float]]):
+    """MAP: sums for a single batch."""
+    xs, ys = batch  # Rozpakowanie krotki na listy danych X i y dla pojedynczej paczki
+
+    # Inicjalizacja akumulatorów sum cząstkowych dla danej paczki
+    sx = 0.0
+    sy = 0.0
+    sxy = 0.0
+    sxx = 0.0
+
+    # Obliczenie sum dla elementów wewnątrz paczki
+    for xi, yi in zip(xs, ys):
+        sx += xi
+        sy += yi
+        sxy += xi * yi
+        sxx += xi * xi
+
+    # Zwrócenie liczby elementów w paczce oraz wyliczonych sum cząstkowych
+    return len(xs), sx, sy, sxy, sxx
+
+
+def _split(X: List[float], y: List[float], n_batches: int):
+    # Obliczenie rozmiaru pojedynczej paczki z zaokrągleniem w górę (ceil division)
+    size = -(-len(X) // n_batches)
+
+    # Tworzenie listy krotek zawierających fragmenty (slajsy) danych X i y
+    return [
+        (X[i:i + size], y[i:i + size]) for i in range(0, len(X), size)
+    ]
+
+
+class LinearRegressionThreads(base.LinearRegression):  # Klasa regresji liniowej z przetwarzaniem wielowątkowym
+    def __init__(self, n_workers: int = 4):
+        super().__init__()  # Wywołanie konstruktora klasy bazowej
+        self.n_workers = n_workers  # Liczba wątków roboczych (domyślnie 4)
+
+    def fit(self, X: List[float], y: List[float]) -> base.LinearRegression:
+        # Podział danych wejściowych na paczki odpowiadające liczbie wątków
+        batches = _split(X, y, self.n_workers)
+
+        # Uruchomienie puli wątków
+        with ThreadPoolExecutor(max_workers=self.n_workers) as ex:
+            # FAZA MAP: równoległe uruchomienie funkcji _partial_sums dla każdej paczki danych
+            parts = list(ex.map(_partial_sums, batches))
+
+        # FAZA REDUCE: zsumowanie wyników ze wszystkich wątków (agregacja sum cząstkowych)
+        n = sum(p[0] for p in parts)    # Całkowita liczba próbek
+        sx = sum(p[1] for p in parts)   # Całkowita suma X
+        sy = sum(p[2] for p in parts)   # Całkowita suma y
+        sxy = sum(p[3] for p in parts)  # Całkowita suma iloczynów (X * y)
+        sxx = sum(p[4] for p in parts)  # Całkowita suma kwadratów (X^2)
+
+        # Obliczenie współczynnika kierunkowego b1 (slope) wg wzoru MNK
+        b1 = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+
+        # Obliczenie wyrazu wolnego b0 (intercept)
+        b0 = (sy - b1 * sx) / n
+
+        # Zapisanie obliczonych parametrów do atrybutu obiektu
+        self._coef = (b0, b1)
+
+        # Zwrócenie instancji obiektu (umożliwia chaining, np. model.fit(X, y).predict(X))
+        return self

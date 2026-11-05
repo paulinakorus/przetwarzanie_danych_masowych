@@ -1,0 +1,33 @@
+from typing import List  # Import struktury List do adnotacji typów
+
+from lr import base  # Import modułu bazowego zawierającego abstrakcyjną klasę LinearRegression
+
+
+class LinearRegressionSequential(base.LinearRegression):  # Konkretna klasa regresji liniowej dziedzicząca po klasie bazowej
+    def fit(self, X: List[float], y: List[float]) -> base.LinearRegression:
+        n = len(X)  # Pobranie liczby próbek w zbiorze treningowym
+
+        # Inicjalizacja zmiennych akumulujących sumy dla Metody Najmniejszych Kwadratów (MNK)
+        sx = 0.0   # Suma elementów X
+        sy = 0.0   # Suma elementów y
+        sxy = 0.0  # Suma iloczynów (x * y)
+        sxx = 0.0  # Suma kwadratów (x^2)
+
+        # Sekwencyjne sumowanie wartości w jednej pętli dla wszystkich próbek
+        for xi, yi in zip(X, y):
+            sx += xi          # Sumowanie wartości X
+            sy += yi          # Sumowanie wartości y
+            sxy += xi * yi    # Sumowanie iloczynów X * y
+            sxx += xi * xi    # Sumowanie kwadratów X^2
+
+        # Obliczenie współczynnika kierunkowego b1 (slope) wg wzoru MNK
+        b1 = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+
+        # Obliczenie wyrazu wolnego b0 (intercept)
+        b0 = (sy - b1 * sx) / n
+
+        # Zapisanie obliczonych parametrów prostej jako krotka (wyraz wolny b0, nachylenie b1)
+        self._coef = (b0, b1)
+
+        # Zwrócenie obiektu self (umożliwia wywoływanie metod łańcuchowo, np. model.fit(X, y).predict(X))
+        return self
