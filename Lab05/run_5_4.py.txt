@@ -1,0 +1,18 @@
+from celery import chain, group
+
+from tasks import random_number, save_word, scrape_nth_word
+
+# 30 niezależnych potoków uruchamianych równolegle
+pipelines = group(
+    # jeden potok: wynik każdego kroku jest argumentem następnego
+    # random_number -> n  =>  scrape_nth_word(n) -> słowo  =>  save_word(słowo)
+    chain(random_number.s(), scrape_nth_word.s(), save_word.s())
+    for _ in range(30)
+)
+
+# wysyła wszystko do brokera i wraca od razu
+res = pipelines()
+
+# czeka max 5 min; propagate=False: nieudane potoki wracają jako obiekty błędów
+# zamiast przerywać całość (np. artykuł za krótki dla danego n)
+print(res.get(timeout=300, propagate=False))

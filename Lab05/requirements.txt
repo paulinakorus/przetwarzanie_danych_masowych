@@ -1,0 +1,5 @@
+celery==5.6.3
+redis
+requests
+beautifulsoup4
+flower

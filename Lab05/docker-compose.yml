@@ -1,0 +1,72 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4-management
+    ports: ["15672:15672"]
+    volumes:
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-celery.conf:ro
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 12
+
+  redis:
+    image: redis:8-alpine
+
+  # Zad. 5.1: ogolny worker (kolejka domyslna 'celery')
+  worker:
+    build: .
+    command: celery -A tasks worker -l info -Q celery
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Zad. 5.2/5.4: scraper, skalowany: docker compose up --scale scraper=3
+  scraper:
+    build: .
+    command: celery -A tasks worker -l info -Q scraper --concurrency=1
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Zad. 5.3: jeden piszacy worker + flock na wspolnym wolumenie
+  poem:
+    build: .
+    command: celery -A tasks worker -l info -Q poem --concurrency=1
+    volumes:
+      - poemdata:/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # Zad. 5.5
+  flower:
+    build: .
+    command: celery -A tasks flower --port=5555 --broker-api=http://guest:guest@rabbitmq:15672/api/
+    ports: ["5555:5555"]
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # klient uruchamiajacy skrypty zadan
+  client:
+    build: .
+    command: sleep infinity
+    volumes:
+      - poemdata:/data
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+volumes:
+  poemdata:

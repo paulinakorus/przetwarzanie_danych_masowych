@@ -1,0 +1,162 @@
+# =============================================================================
+# Laboratorium 5: Celery + RabbitMQ + Redis w docker compose
+#
+# Architektura:
+#   client ──zleca zadania──► rabbitmq ──► kolejka "celery"  ──► worker    (5.1)
+#                                      ├─► kolejka "scraper" ──► scraper×3 (5.2, 5.4)
+#                                      └─► kolejka "poem"    ──► poem×1    (5.3)
+#   wyniki zadań ──► redis
+#   flower ──► podgląd workerów (zdarzenia) i kolejek (API RabbitMQ)   (5.5)
+#
+# Uruchomienie:
+#   docker compose up -d --build --scale scraper=3
+# =============================================================================
+
+services:
+
+  # ---------------------------------------------------------------------------
+  # BROKER: przechowuje zlecenia (wiadomości), dopóki worker ich nie odbierze.
+  # ---------------------------------------------------------------------------
+  rabbitmq:
+    # Wersja 4 z wbudowanym panelem webowym (management).
+    image: rabbitmq:4-management
+
+    # Format "port_na_komputerze:port_w_kontenerze".
+    # 15672 to panel webowy: http://localhost:15672 (login guest / guest).
+    # Port brokera (5672) celowo NIE jest wystawiony: łączą się z nim tylko
+    # inne kontenery, po adresie "rabbitmq:5672" wewnątrz sieci compose.
+    ports: ["15672:15672"]
+
+    volumes:
+      # Wstrzykuje do kontenera plik konfiguracji z naszego komputera.
+      # Plik zawiera: deprecated_features.permit.transient_nonexcl_queues = true
+      # Bez niego RabbitMQ 4 odrzuca tymczasowe kolejki, których potrzebuje
+      # Flower (i backend rpc://).
+      # ":ro" = tylko do odczytu. Plik rabbitmq.conf musi istnieć przed startem.
+      - ./rabbitmq.conf:/etc/rabbitmq/conf.d/20-celery.conf:ro
+
+    # Sprawdzanie, czy broker NAPRAWDĘ działa (sam start kontenera to za mało).
+    # Inne usługi czekają na ten stan dzięki "condition: service_healthy".
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]  # kod 0, gdy broker odpowiada
+      interval: 5s     # sprawdzaj co 5 sekund
+      timeout: 10s     # jedno sprawdzenie może trwać maksymalnie 10 s
+      retries: 12      # po 12 porażkach z rzędu kontener jest "unhealthy" (~1 min na start)
+
+  # ---------------------------------------------------------------------------
+  # BACKEND WYNIKÓW: tu worker zapisuje stan i wynik zadania, stąd czyta je
+  # r.get(). Bez "ports": potrzebują go tylko inne kontenery (adres redis:6379).
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:8-alpine   # "alpine" = mały obraz
+
+  # ---------------------------------------------------------------------------
+  # Zad. 5.1: ogólny worker. Obsługuje domyślną kolejkę "celery"
+  # (tam trafia random_number, bo nie ma dla niego wpisu w task_routes).
+  # ---------------------------------------------------------------------------
+  worker:
+    build: .   # buduje obraz z Dockerfile w bieżącym katalogu (kod z tasks.py)
+
+    # celery -A tasks   → aplikacja Celery znajduje się w module tasks (tasks.py)
+    # worker            → uruchom workera (proces pobierający i wykonujący zadania)
+    # -l info           → logi na poziomie info (widać odbiór i wynik każdego zadania)
+    # -Q celery         → nasłuchuj TYLKO kolejki "celery" (to też kolejka domyślna)
+    # Brak --concurrency: liczba procesów = liczba rdzeni CPU.
+    command: celery -A tasks worker -l info -Q celery
+
+    # Kolejność startu: czekaj, aż RabbitMQ przejdzie healthcheck, a Redis
+    # wystarczy, że wystartował. (Ten sam blok powtarza się w kolejnych usługach.)
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Zad. 5.2 / 5.4: worker scrapujący Wikipedię (zadanie scrape_nth_word).
+  # Skalowanie do 3 instancji:  docker compose up -d --scale scraper=3
+  # (działa, bo usługa nie ma stałego portu na hoście).
+  # ---------------------------------------------------------------------------
+  scraper:
+    build: .
+
+    # -Q scraper        → tylko kolejka "scraper" (routing: tasks.scrape_nth_word)
+    # --concurrency=1   → JEDEN proces na kontener. Bez tego każdy kontener
+    #                     startowałby tyle procesów, ile ma rdzeni CPU, więc
+    #                     --scale 3 nie dałoby 3 scraperów, tylko 3 × liczba rdzeni.
+    command: celery -A tasks worker -l info -Q scraper --concurrency=1
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Zad. 5.3: JEDEN piszący worker (zadanie save_word).
+  # Zapisy do pliku są bezpieczne z dwóch powodów:
+  #   1) kolejka "poem" ma jednego workera z jednym procesem, więc zadania
+  #      wykonują się po kolei,
+  #   2) w kodzie jest dodatkowo blokada flock na współdzielonym wolumenie.
+  # ---------------------------------------------------------------------------
+  poem:
+    build: .
+    command: celery -A tasks worker -l info -Q poem --concurrency=1  # kolejka "poem", 1 proces
+
+    volumes:
+      # Nazwany wolumen (zadeklarowany na dole pliku) zamontowany pod /data.
+      # Tu powstaje plik /data/poem.txt.
+      - poemdata:/data
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Zad. 5.5: Flower, panel monitoringu: http://localhost:5555
+  # Pokazuje workery, zadania i ich stany oraz (przez API RabbitMQ) kolejki.
+  # Wymaga w tasks.py: worker_send_task_events i task_send_sent_event.
+  # ---------------------------------------------------------------------------
+  flower:
+    build: .
+
+    # --port=5555    → port panelu wewnątrz kontenera
+    # --broker-api   → adres API zarządzania RabbitMQ (stąd obraz "-management");
+    #                  dzięki niemu Flower widzi długości kolejek.
+    command: celery -A tasks flower --port=5555 --broker-api=http://guest:guest@rabbitmq:15672/api/
+
+    ports: ["5555:5555"]   # panel dostępny z przeglądarki na naszym komputerze
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Klient: kontener, z którego uruchamiamy skrypty zlecające zadania, np.:
+  #   docker compose exec client python <skrypt>.py
+  # ---------------------------------------------------------------------------
+  client:
+    build: .
+    command: sleep infinity   # nic nie robi, ale nie kończy się (inaczej kontener od razu by zniknął)
+
+    volumes:
+      # Ten sam wolumen co w "poem": możemy odczytać poemat (cat /data/poem.txt).
+      - poemdata:/data
+
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+# -----------------------------------------------------------------------------
+# Deklaracja nazwanego wolumenu współdzielonego przez "poem" i "client".
+# Dane przeżywają "docker compose down"; usuwa je dopiero "docker compose down -v"
+# (uwaga: poemat dopisuje się między kolejnymi uruchomieniami).
+# -----------------------------------------------------------------------------
+volumes:
+  poemdata:

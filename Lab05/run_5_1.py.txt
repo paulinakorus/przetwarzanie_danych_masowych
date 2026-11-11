@@ -1,0 +1,12 @@
+from celery import group
+
+from tasks import random_number   # import rejestruje zadanie i routing z tasks.py
+
+# 100 sygnatur zadania, połączonych w grupę; () wysyła je wszystkie do brokera
+# i wraca od razu (asynchronicznie)
+results = group(random_number.s() for _ in range(100))()
+
+# czeka (max 60 s) na wszystkie wyniki z Redisa -> lista 100 liczb z [0; 200]
+numbers = results.get(timeout=60)
+
+print(len(numbers), numbers)
