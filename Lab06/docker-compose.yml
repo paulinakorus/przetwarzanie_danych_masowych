@@ -1,0 +1,58 @@
+x-spark-image: &spark-image "${SPARK_IMAGE:-bitnamilegacy/spark:3.5.5}"
+
+services:
+  # Katalog /data musi być zapisywalny dla użytkownika uid 1001 (bitnami) we
+  # WSZYSTKICH kontenerach - bez tego zapis z executorów się nie uda.
+  init-data:
+    image: busybox:1.36
+    command: ["sh", "-c", "mkdir -p /data && chmod -R 777 /data"]
+    volumes:
+      - spark-data:/data
+
+  spark-master:
+    image: *spark-image
+    container_name: "spark-master"
+    environment:
+      - SPARK_MODE=master
+    ports:
+      - "7077:7077"  # Spark master port
+      - "8080:8080"  # Spark web UI
+
+  spark-worker:
+    image: *spark-image
+    deploy:
+      replicas: 3
+    depends_on:
+      - spark-master
+      - init-data
+    environment:
+      - SPARK_MODE=worker
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - SPARK_WORKER_MEMORY=2G
+      - SPARK_WORKER_CORES=1
+    volumes:
+      - spark-data:/data
+
+  spark-app:
+    image: *spark-image
+    container_name: "spark-app"
+    depends_on:
+      - spark-master
+      - spark-worker
+      - init-data
+    ports:
+      - "4040:4040"  # Spark UI aplikacji (DAG, stages) - tylko gdy aplikacja działa
+    environment:
+      - SPARK_MASTER_URL=spark://spark-master:7077
+      - PYTHONPATH=/opt/bitnami/spark/python/lib/py4j-0.10.9.7-src.zip:/opt/bitnami/spark/python/
+      - KEEP_ALIVE_SECONDS=${KEEP_ALIVE_SECONDS:-0}
+    volumes:
+      - ./main.py:/app/main.py
+      - spark-data:/data
+    # all | example | numbers | strings | count
+    command: ["python3", "/app/main.py", "all"]
+
+# Wolumen nazwany (system plików Linuksa w Dockerze). Bind mount ./data na dysku
+# Windows (/mnt/c) nie wspiera chmod, którego wymaga zapis Hadoopa/Sparka.
+volumes:
+  spark-data:
